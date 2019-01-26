@@ -1,0 +1,29 @@
+{
+  "name": "humandb-1up-integration-container",
+  "description": "Provides FHIR server data synchronization between 1up.health and the HumanDB FHIR server",
+  "version": "0.0.1",
+  "homepage": "https://humandb.ai/",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "lint": "standard --fix",
+    "start": "node src/index.js",
+    "start-dev": "nodemon"
+  },
+  "dependencies": {
+    "@feathersjs/authentication-client": "^1.0.10",
+    "@feathersjs/feathers": "^3.3.1",
+    "@feathersjs/socketio-client": "^1.2.1",
+    "app-module-path": "^2.2.0",
+    "bluebird": "^3.5.3",
+    "express": "^4.16.4",
+    "humandb-auth-api-connector": "https://github.com/jordandenison/humandb-auth-connector.git",
+    "socket.io-client": "^2.2.0",
+    "superagent": "^3.8.3",
+    "winston": "^2.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^1.12.1",
+    "standard": "^10.0.3"
+  }
+}
