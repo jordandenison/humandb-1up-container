@@ -3,6 +3,7 @@ const { map } = require('bluebird')
 const { init: authInit } = require('humandb-auth-api-connector')
 
 const { delay } = require('lib/util')
+const fhriResourcesStu2 = require('data/fhir-resources-stu2')
 
 const url = process.env.ONE_UP_API_URL || 'https://api.1up.health'
 const clientId = process.env.ONE_UP_CLIENT_ID
@@ -68,14 +69,30 @@ const getCredentials = async () => {
 }
 
 const syncData = async () => {
+  console.log('Syncing Data Started')
   const { accessToken } = await getCredentials()
 
-  const result = await superagent.get(`${url}/fhir/dstu2/Patient`).set({ Authorization: `Bearer ${accessToken}` })
-  await map(result.body.entry, async entry => {
-    const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
+  await map(fhriResourcesStu2, async resource => {
+    const result = await superagent.get(`${url}/fhir/dstu2/${resource}`).set({ Authorization: `Bearer ${accessToken}` })
 
-    return superagent.put(`${process.env.FHIR_SERVER_BASE_URL}/Patient/${entryResult.body.id}`).send(entryResult.body)
-  })
+    await map(result.body.entry, async entry => {
+      const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
+
+      return superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU2}/${resource}/${entryResult.body.id}`).send(entryResult.body)
+    })
+  }, { concurrency: 1 })
+
+  // await map(fhriResourcesStu3, async resource => {
+  //   const result = await superagent.get(`${url}/fhir/dstu3/${resource}`).set({ Authorization: `Bearer ${accessToken}` })
+  //   console.log('res body stu3 ', result.body.entry) // undefined
+  //   await map(result.body.entry, async entry => {
+  //     const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
+
+  //     return superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU3}/${resource}/${entryResult.body.id}`).send(entryResult.body)
+  //   })
+  // }, { concurrency: 1 })
+
+  console.log('Syncing Data Finished')
 }
 
 const init = async () => {

@@ -6,7 +6,7 @@ const port = process.env.PORT || 80
 
 const oneUp = require('lib/1up')
 
-app.get('/sync-data', async (req, res, next) => {
+app.post('/sync-data', async (req, res, next) => {
   try {
     await oneUp.syncData()
   } catch (e) {
