@@ -10,6 +10,7 @@ const clientId = process.env.ONE_UP_CLIENT_ID
 const clientSecret = process.env.ONE_UP_CLIENT_SECRET
 const accessTokenLifespan = process.env.ACCESS_TOKEN_LIFESPAN || 7000000
 
+let app
 let currentAccessToken
 
 const getAuthCode = async userId => {
@@ -68,38 +69,68 @@ const getCredentials = async () => {
   return { url, accessToken: currentAccessToken }
 }
 
+const notify = async ({ status, description, dependency = 'FHIR Data Retrieval', error = '', service = '1up' }) => {
+  const query = { service, dependency }
+  const { total } = await app.service('status').find({ query })
+
+  if (total) {
+    return app.service('status').patch(null, { status, error, description }, { query })
+  }
+
+  return app.service('status').create({ service, status, dependency, description, error })
+}
+
 const syncData = async () => {
-  console.log('Syncing Data Started')
-  const { accessToken } = await getCredentials()
+  try {
+    await notify({ description: 'Data sync started.', status: 'In Progress' })
 
-  await map(fhriResourcesStu2, async resource => {
-    const result = await superagent.get(`${url}/fhir/dstu2/${resource}`).set({ Authorization: `Bearer ${accessToken}` })
+    const { accessToken } = await getCredentials()
 
-    await map(result.body.entry, async entry => {
-      const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
+    const resourceCount = {}
 
-      return superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU2}/${resource}/${entryResult.body.id}`).send(entryResult.body)
-    })
-  }, { concurrency: 1 })
+    await map(fhriResourcesStu2, async resource => {
+      await notify({ description: `Syncing "${resource}" resource.`, status: 'In Progress' })
 
-  // await map(fhriResourcesStu3, async resource => {
-  //   const result = await superagent.get(`${url}/fhir/dstu3/${resource}`).set({ Authorization: `Bearer ${accessToken}` })
-  //   console.log('res body stu3 ', result.body.entry) // undefined
-  //   await map(result.body.entry, async entry => {
-  //     const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
+      const result = await superagent.get(`${url}/fhir/dstu2/${resource}`).set({ Authorization: `Bearer ${accessToken}` })
 
-  //     return superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU3}/${resource}/${entryResult.body.id}`).send(entryResult.body)
-  //   })
-  // }, { concurrency: 1 })
+      resourceCount[resource] = result.body.entry.length
 
-  console.log('Syncing Data Finished')
+      await map(result.body.entry, async entry => {
+        const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
+
+        return superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU2}/${resource}/${entryResult.body.id}`).send(entryResult.body)
+      })
+    }, { concurrency: 1 })
+
+    // await map(fhriResourcesStu3, async resource => {
+    //   const result = await superagent.get(`${url}/fhir/dstu3/${resource}`).set({ Authorization: `Bearer ${accessToken}` })
+    //   console.log('res body stu3 ', result.body.entry) // undefined
+    //   await map(result.body.entry, async entry => {
+    //     const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
+
+    //     return superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU3}/${resource}/${entryResult.body.id}`).send(entryResult.body)
+    //   })
+    // }, { concurrency: 1 })
+    
+    // const description = `Data sync finished. Total records synced: ${JSON.stringify(resourceCount, null, 2)}`
+    const description = `Data sync finished. Total records synced: ${Object.keys(resourceCount).reduce((result, key) => {
+      result = result + resourceCount[key]
+      return result
+    }, 0)}.`
+    await notify({ description , status: 'Complete' })
+
+    console.log('Syncing Data Finished')
+  } catch (e) {
+    await notify({ description: 'Data sync error', status: 'Incomplete', error: e.message })
+    console.log(`Syncing Data Error ${e.stack}`)
+  }
 }
 
 const init = async () => {
   const authApiUsername = process.env.AUTH_API_USERNAME || 'test'
   const authApiPassword = process.env.AUTH_API_PASSWORD || 'test'
 
-  const app = await authInit(authApiUsername, authApiPassword)
+  app = await authInit(authApiUsername, authApiPassword)
 
   const ownerResults = await app.service('user').find({ query: { role: 'owner' } })
   const [owner] = ownerResults.data
@@ -112,6 +143,8 @@ const init = async () => {
 
   if (process.env.ONE_UP_SYNC_ON_STARTUP) {
     syncData()
+  } else {
+    await notify({ description: 'Data sync ready.', status: 'Available' })
   }
 }
 
