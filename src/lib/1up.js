@@ -12,6 +12,7 @@ const accessTokenLifespan = process.env.ACCESS_TOKEN_LIFESPAN || 7000000
 
 let app
 let currentAccessToken
+let syncing
 
 const getAuthCode = async userId => {
   const newUserResult = await superagent.post(`${url}/user-management/v1/user`).send({ client_id: clientId, client_secret: clientSecret, app_user_id: userId })
@@ -81,7 +82,10 @@ const notify = async ({ status, description, dependency = 'FHIR Data Retrieval',
 }
 
 const syncData = async () => {
+  if (syncing) { return }
+
   try {
+    syncing = true
     await notify({ description: 'Data sync started.', status: 'In Progress' })
 
     const { accessToken } = await getCredentials()
@@ -143,10 +147,12 @@ const syncData = async () => {
     }, 0)}.`
     await notify({ description, status: 'Complete' })
 
+    syncing = false
     console.log('Syncing Data Finished')
   } catch (e) {
     await notify({ description: 'Data sync error', status: 'Incomplete', error: e.message })
     console.log(`Syncing Data Error ${e.stack}`)
+    syncing = false
   }
 }
 
