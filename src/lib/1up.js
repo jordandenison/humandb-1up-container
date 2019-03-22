@@ -91,15 +91,39 @@ const syncData = async () => {
     await map(fhriResourcesStu2, async resource => {
       await notify({ description: `Syncing "${resource}" resource.`, status: 'In Progress' })
 
-      const result = await superagent.get(`${url}/fhir/dstu2/${resource}`).set({ Authorization: `Bearer ${accessToken}` })
+      const fetch = async (nextUrl) => {
+        const result = await superagent.get(nextUrl).set({ Authorization: `Bearer ${accessToken}` })
 
-      resourceCount[resource] = result.body.entry.length
+        if (resourceCount[resource]) {
+          resourceCount[resource] += result.body.entry.length
+        } else {
+          resourceCount[resource] = result.body.entry.length
+        }
 
-      await map(result.body.entry, async entry => {
-        const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
+        await map(result.body.entry, async entry => {
+          const entryResult = await superagent.get(entry.fullUrl).set({ Authorization: `Bearer ${accessToken}` })
 
-        return superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU2}/${resource}/${entryResult.body.id}`).send(entryResult.body)
-      })
+          try {
+            await superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU2}/${resource}/${entryResult.body.id}`).send(entryResult.body)
+          } catch (e) {
+            console.log(`Error inserting ${resource} ${entryResult.body.id}, error: ${e.message}`)
+          }
+        })
+
+        const next = result.body && Array.isArray(result.body.link) && result.body.link.reduce((result, link) => {
+          if (result) { return result }
+
+          if (link.relation === 'next') {
+            return link.url
+          }
+        }, '')
+
+        if (next) {
+          return fetch(next)
+        }
+      }
+
+      return fetch(`${url}/fhir/dstu2/${resource}`)
     }, { concurrency: 1 })
 
     // await map(fhriResourcesStu3, async resource => {
@@ -111,13 +135,13 @@ const syncData = async () => {
     //     return superagent.put(`${process.env.FHIR_SERVER_BASE_URL_STU3}/${resource}/${entryResult.body.id}`).send(entryResult.body)
     //   })
     // }, { concurrency: 1 })
-    
+
     // const description = `Data sync finished. Total records synced: ${JSON.stringify(resourceCount, null, 2)}`
     const description = `Data sync finished. Total records synced: ${Object.keys(resourceCount).reduce((result, key) => {
       result = result + resourceCount[key]
       return result
     }, 0)}.`
-    await notify({ description , status: 'Complete' })
+    await notify({ description, status: 'Complete' })
 
     console.log('Syncing Data Finished')
   } catch (e) {
