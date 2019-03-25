@@ -8,7 +8,7 @@ const oneUp = require('lib/1up')
 
 app.post('/sync-data', async (req, res, next) => {
   try {
-    await oneUp.syncData()
+    oneUp.syncData()
   } catch (e) {
     next(e)
   }
