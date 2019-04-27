@@ -1,6 +1,6 @@
 const superagent = require('superagent')
 const { map } = require('bluebird')
-const { init: authInit } = require('humandb-auth-api-connector')
+const { init: authInit } = require('humandb-auth-api-connector-rest')
 
 const { delay } = require('lib/util')
 const fhriResourcesStu2 = require('data/fhir-resources-stu2')
