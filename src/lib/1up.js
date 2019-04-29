@@ -162,8 +162,8 @@ const syncData = async () => {
 }
 
 const init = async () => {
-  const authApiUsername = process.env.AUTH_API_USERNAME || 'test'
-  const authApiPassword = process.env.AUTH_API_PASSWORD || 'test'
+  const authApiUsername = process.env.INTERNAL_API_USERNAME || 'test'
+  const authApiPassword = process.env.INTERNAL_API_PASSWORD || 'test'
 
   app = await authInit(authApiUsername, authApiPassword)
 
