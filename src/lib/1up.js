@@ -1,11 +1,14 @@
 const superagent = require('superagent')
+const moment = require('moment')
 const { map } = require('bluebird')
 const { init: authInit } = require('humandb-auth-api-connector-rest')
 
 const { delay } = require('lib/util')
+const { postMessage } = require('lib/discussion')
 const fhriResourcesStu2 = require('data/fhir-resources-stu2')
 
 const url = process.env.ONE_UP_API_URL || 'https://api.1up.health'
+
 const clientId = process.env.ONE_UP_CLIENT_ID
 const clientSecret = process.env.ONE_UP_CLIENT_SECRET
 const accessTokenLifespan = process.env.ACCESS_TOKEN_LIFESPAN || 7000000
@@ -146,6 +149,8 @@ const syncData = async () => {
       return result
     }, 0)}.`
     await notify({ description, status: 'Complete' })
+
+    await postMessage(`Total FHIR records sycned as of ${moment().format("dddd, MMMM Do YYYY, h:mm:ss a")}`, JSON.stringify(resourceCount, null, 2))
 
     syncing = false
     console.log('Syncing Data Finished')
